@@ -1,3 +1,4 @@
+// QRCodeScannerScreen.tsx
 import React, {useState, useEffect, useCallback} from 'react';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {

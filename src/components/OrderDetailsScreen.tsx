@@ -1,3 +1,4 @@
+// OrderDetailsScreen.tsx
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -88,9 +89,11 @@ export default function OrderDetailsScreen({
         setError('Не удалось получить ID пользователя');
         return;
       }
-      console.log('userId: ' + userId);
-      console.log('qrCode: ' + qrCode);
-      console.log('ORDER_ID: ' + orderId);
+
+      // console.log('userId: ' + userId); --- delete
+      // console.log('qrCode: ' + qrCode); --- delete
+      // console.log('ORDER_ID: ' + orderId); --- delete
+
       const response = await axios.get(`${API_BASE_URL}/rest/orders/getInfo/`, {
         params: {
           USER_ID: userId,
@@ -102,6 +105,7 @@ export default function OrderDetailsScreen({
 
       if (response.data.RESULT) {
         setOrderDetails(response.data.RESULT);
+        // console.log(response.data.RESULT); --- delete
         setProducts(
           response.data.RESULT.items.map((item: Product) => ({
             ...item,

@@ -1,3 +1,4 @@
+// ProfileScreen.tsx
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -100,6 +101,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
 
         if (response.data.RESULT) {
           setUserInfo(response.data.RESULT);
+          // console.log(response.data.RESULT); --- delete
           setUpdatedUserInfo(response.data.RESULT);
         } else {
           Alert.alert('Ошибка', 'Не удалось получить данные пользователя');

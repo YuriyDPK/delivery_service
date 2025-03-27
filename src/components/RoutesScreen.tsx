@@ -1,3 +1,4 @@
+// RoutesScreen.tsx
 import React, {useState, useEffect, useCallback} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -154,10 +155,9 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
           DATE_END: futureDate,
         },
       });
-      console.log(123);
 
       if (response.data.RESULT) {
-        console.log(response.data.RESULT);
+        // console.log(response.data.RESULT); --- delete
 
         const updatedRoutes = response.data.RESULT.map((route: any) => ({
           ...route,

@@ -15,7 +15,6 @@ import QRCodeScannerScreen from './src/components/QRCodeScannerScreen';
 import DataMatrixCodeScannerScreen from './src/components/DataMatrixCodeScannerScreen';
 import LoginScreen from './src/components/LoginScreen';
 import MapScreen from './src/components/MapScreen';
-import PrinterScreen from './src/components/PrinterScreen';
 
 import {UserContext} from './UserContext';
 
