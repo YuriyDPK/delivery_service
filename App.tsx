@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import {StyleSheet, Alert} from 'react-native';
+import {StyleSheet, Alert, AppState, AppStateStatus} from 'react-native';
 import React, {useEffect, useRef, useState, useContext} from 'react';
 
 import {UserProvider} from './UserContext';
@@ -8,12 +8,14 @@ import {initDB} from './src/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {syncDataFromServer, syncPendingRequests} from './src/sync';
 import {NetworkProvider, NetworkContext} from './src/components/NetworkContext';
+import {SyncProvider, SyncContext} from './SyncContext';
 
 function AppContent() {
   const {isConnected} = useContext(NetworkContext);
   const [userId, setUserId] = useState<string | null>(null);
   const wasOfflineRef = useRef(false);
   const hasSyncedOnceRef = useRef(false); // 👈 чтобы не дублировать первую синхронизацию
+  const {isSyncing} = useContext(SyncContext);
 
   // Инициализация БД и userId
   useEffect(() => {
@@ -26,6 +28,26 @@ function AppContent() {
     };
     init();
   }, []);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background' && isSyncing) {
+        Alert.alert(
+          'Синхронизация',
+          'Идёт синхронизация кодов честного знака. Пожалуйста, не сворачивайте или не закрывайте приложение, пока все коды не будут отправлены.',
+        );
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isSyncing]);
 
   // Синхронизация при первом запуске и при восстановлении интернета
   useEffect(() => {
@@ -43,8 +65,8 @@ function AppContent() {
         hasSyncedOnceRef.current = true;
 
         Alert.alert('Интернет доступен', 'Выполнена синхронизация');
-        syncDataFromServer();
         syncPendingRequests();
+        syncDataFromServer();
       }
     }
   }, [isConnected, userId]);
@@ -59,7 +81,9 @@ function AppContent() {
 export default function App() {
   return (
     <NetworkProvider>
-      <AppContent />
+      <SyncProvider>
+        <AppContent />
+      </SyncProvider>
     </NetworkProvider>
   );
 }

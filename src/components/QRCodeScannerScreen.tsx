@@ -1,5 +1,4 @@
-// QRCodeScannerScreen.tsx
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useContext} from 'react';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {
   View,
@@ -13,7 +12,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
-import {Camera, CameraType} from 'react-native-camera-kit';
+import {Camera} from 'react-native-camera-kit';
+
+import {NetworkContext} from '../components/NetworkContext';
+import {getDB} from '../database';
 
 interface QRCodeScannerScreenProps {
   route: any;
@@ -21,6 +23,7 @@ interface QRCodeScannerScreenProps {
 
 const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
   const navigation = useNavigation();
+  const {isConnected} = useContext(NetworkContext);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   const [scanned, setScanned] = useState<boolean>(false);
   const [scannerKey, setScannerKey] = useState<number>(Date.now());
@@ -72,25 +75,111 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
 
       const qrCode = nativeEvent.codeStringValue.trim();
 
-      const response = await axios.get(`${API_BASE_URL}/rest/orders/getInfo/`, {
-        params: {
-          USER_ID: userId,
-          ORDER_ID: 0,
-          QR: qrCode,
-          API_KEY: API_KEY,
-        },
-      });
+      if (isConnected) {
+        // Онлайн-режим: делаем запрос к серверу
+        try {
+          const response = await axios.get(
+            `${API_BASE_URL}/rest/orders/getInfo/`,
+            {
+              params: {
+                USER_ID: userId,
+                ORDER_ID: 0,
+                QR: qrCode,
+                API_KEY: API_KEY,
+              },
+            },
+          );
 
-      const json = response.data;
-      if (json.RESULT) {
-        const orderId = json.RESULT.id;
-        navigation.navigate('OrderDetails', {orderId, qrCode});
+          const json = response.data;
+          if (json.RESULT) {
+            const orderId = json.RESULT.id;
+            console.log('orderId: ', orderId);
+            console.log('qrCode: ', qrCode);
+            navigation.navigate('OrderDetails', {orderId, qrCode});
+          } else {
+            Alert.alert('Ошибка', 'Не удалось найти данные по заказу');
+          }
+        } catch (error) {
+          Alert.alert('Ошибка', 'Ошибка при подключении к серверу');
+          console.error('Ошибка при получении информации о заказе:', error);
+        }
       } else {
-        Alert.alert('Ошибка', 'Не удалось найти данные по заказу');
+        // Оффлайн-режим: ищем заказы в локальной базе данных
+        const db = getDB();
+        if (!db) {
+          Alert.alert(
+            'Ошибка',
+            'Не удалось подключиться к локальной базе данных',
+          );
+          return;
+        }
+
+        try {
+          const orders = await new Promise((resolve, reject) => {
+            db.transaction(
+              tx => {
+                tx.executeSql(
+                  'SELECT * FROM orders WHERE qr = ?',
+                  [qrCode],
+                  (_, {rows}) => {
+                    const foundOrders = rows.raw(); // Получаем все записи
+                    console.log(
+                      'Найдено заказов в оффлайн-режиме:',
+                      foundOrders,
+                    );
+                    resolve(foundOrders);
+                  },
+                  (_, err) => {
+                    console.error(
+                      'Ошибка при поиске заказов в базе данных:',
+                      err,
+                    );
+                    reject(err);
+                  },
+                );
+              },
+              error => reject(error),
+            );
+          });
+
+          if (orders.length > 0) {
+            if (orders.length === 1) {
+              // Если найден ровно один заказ, переходим сразу в OrderDetails
+              const orderId = orders[0].id;
+              navigation.navigate('OrderDetails', {orderId, qrCode});
+            } else {
+              // Если найдено несколько заказов, можно показать список для выбора
+              Alert.alert(
+                'Найдено несколько заказов',
+                `Обнаружено ${orders.length} заказов с QR-кодом ${qrCode}. Выберите один:`,
+                orders.map((order, index) => ({
+                  text: `Заказ ${order.id} (${
+                    order.number_act || 'Без номера'
+                  })`,
+                  onPress: () => {
+                    navigation.navigate('OrderDetails', {
+                      orderId: order.id,
+                      qrCode,
+                    });
+                  },
+                })),
+                {cancelable: true},
+              );
+            }
+          } else {
+            Alert.alert('Ошибка', 'Заказ не найден в локальной базе данных');
+          }
+        } catch (error) {
+          Alert.alert(
+            'Ошибка',
+            'Ошибка при поиске заказа в локальной базе данных',
+          );
+          console.error('Ошибка при поиске заказа в оффлайн-режиме:', error);
+        }
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Ошибка при подключении к серверу');
-      console.error('Ошибка при получении информации о заказе:', error);
+      Alert.alert('Ошибка', 'Произошла непредвиденная ошибка');
+      console.error('Ошибка в handleQRCodeScan:', error);
     }
   };
 
@@ -133,8 +222,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   camera: {
-    flex: 1, // Камера занимает всё доступное пространство
-    width: '100%', // Устанавливаем ширину на 100%
+    flex: 1,
+    width: '100%',
   },
   button: {
     position: 'absolute',

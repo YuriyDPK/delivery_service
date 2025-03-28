@@ -1,5 +1,4 @@
-// OrderDetailsScreen.tsx
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -14,18 +13,19 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
-import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {Linking} from 'react-native';
 import {RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {LoginScreenProps} from '../interfaces/interfaces';
+import {NetworkContext} from '../components/NetworkContext'; // Импортируем NetworkContext
 
 import CopyIcon from '../../assets/images/copy.svg';
 import PhoneIcon from '../../assets/images/phone.svg';
 import ScanIcon from '../../assets/images/scan.svg';
 import CheckmarkIcon from '../../assets/images/checkmark.svg';
+import {getDB} from '../database';
 
 // Определите тип для orderDetails
 interface OrderDetails {
@@ -34,6 +34,7 @@ interface OrderDetails {
   address: string;
   phone: string[];
   items: Product[];
+  comment?: string;
 }
 
 // Определите тип для продуктов
@@ -50,7 +51,7 @@ interface Product {
 }
 
 const {width} = Dimensions.get('window');
-const baseWidth = 375; // базовая ширина для вычислений
+const baseWidth = 375;
 const scale = width / baseWidth;
 
 function scaledSize(size: number) {
@@ -62,73 +63,165 @@ export default function OrderDetailsScreen({
   navigation,
 }: LoginScreenProps) {
   const {orderId, qrCode} = route.params;
+  const {isConnected} = useContext(NetworkContext); // Используем NetworkContext
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-
-  // Проверка интернет-соединения
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   // Функция загрузки данных заказа
   const fetchOrderDetails = async () => {
     setLoading(true);
+    setError(null);
+
     try {
       const userId = await AsyncStorage.getItem('userId');
-
       if (!userId) {
-        setLoading(false);
         setError('Не удалось получить ID пользователя');
         return;
       }
 
-      // console.log('userId: ' + userId); --- delete
-      // console.log('qrCode: ' + qrCode); --- delete
-      // console.log('ORDER_ID: ' + orderId); --- delete
+      if (isConnected) {
+        // Онлайн-режим: делаем запрос к серверу
+        try {
+          const response = await axios.get(
+            `${API_BASE_URL}/rest/orders/getInfo/`,
+            {
+              params: {
+                USER_ID: userId,
+                ORDER_ID: orderId,
+                QR: qrCode,
+                API_KEY,
+              },
+            },
+          );
 
-      const response = await axios.get(`${API_BASE_URL}/rest/orders/getInfo/`, {
-        params: {
-          USER_ID: userId,
-          ORDER_ID: orderId,
-          QR: qrCode,
-          API_KEY,
-        },
-      });
-
-      if (response.data.RESULT) {
-        setOrderDetails(response.data.RESULT);
-        // console.log(response.data.RESULT); --- delete
-        setProducts(
-          response.data.RESULT.items.map((item: Product) => ({
-            ...item,
-            showDetails: false, // Добавляем поле showDetails с типом
-          })),
-        );
+          if (response.data.RESULT) {
+            const fetchedOrder = response.data.RESULT;
+            setOrderDetails({
+              id: fetchedOrder.id,
+              clientFio: fetchedOrder.clientFio || '',
+              address: fetchedOrder.address || '',
+              phone: fetchedOrder.phone || [],
+              items: fetchedOrder.items || [],
+              comment: fetchedOrder.comment || '',
+            });
+            setProducts(
+              (fetchedOrder.items || []).map((item: Product) => ({
+                ...item,
+                showDetails: false,
+              })),
+            );
+          } else {
+            setError('Не удалось получить данные заказа');
+          }
+        } catch (err) {
+          setError('Ошибка при загрузке данных заказа с сервера');
+          console.error('Ошибка при получении данных заказа:', err);
+        }
       } else {
-        setError('Не удалось получить данные заказа');
+        // Оффлайн-режим: загружаем данные из локальной базы данных
+        const db = getDB();
+        if (!db) {
+          setError('Не удалось подключиться к локальной базе данных');
+          return;
+        }
+
+        try {
+          const order = await new Promise((resolve, reject) => {
+            db.transaction(
+              tx => {
+                tx.executeSql(
+                  'SELECT * FROM orders WHERE id = ? LIMIT 1',
+                  [orderId],
+                  (_, {rows}) => {
+                    if (rows.length > 0) {
+                      const foundOrder = rows.item(0);
+                      console.log('Найден заказ в оффлайн-режиме:', foundOrder);
+                      resolve(foundOrder);
+                    } else {
+                      resolve(null);
+                    }
+                  },
+                  (_, err) => {
+                    console.error(
+                      'Ошибка при поиске заказа в базе данных:',
+                      err,
+                    );
+                    reject(err);
+                  },
+                );
+              },
+              error => reject(error),
+            );
+          });
+
+          if (order) {
+            // Парсим JSON-поля (phone и items), так как они хранятся в виде строк
+            const parsedPhone = order.phone ? JSON.parse(order.phone) : [];
+            let parsedItems: any[] = [];
+            try {
+              parsedItems = JSON.parse(order.items || '[]');
+
+              // если вложенный массив — разворачиваем
+              if (Array.isArray(parsedItems[0])) {
+                parsedItems = parsedItems[0];
+              }
+            } catch (err) {
+              console.error('Ошибка парсинга items:', err);
+            }
+
+            setOrderDetails({
+              id: order.id,
+              clientFio: order.clientFio || '',
+              address: order.address || '',
+              phone: parsedPhone,
+              items: parsedItems,
+              comment: order.comment || '',
+            });
+            setProducts(
+              parsedItems
+                .filter(
+                  item =>
+                    item.name ||
+                    item.size ||
+                    item.volume ||
+                    item.quantity ||
+                    item.summ ||
+                    item.comment,
+                )
+                .map((item: Product) => ({
+                  ...item,
+                  showDetails: false,
+                })),
+            );
+          } else {
+            setError('Заказ не найден в локальной базе данных');
+          }
+        } catch (error) {
+          setError(
+            'Ошибка при загрузке данных заказа из локальной базы данных',
+          );
+          console.error('Ошибка при поиске заказа в оффлайн-режиме:', error);
+        }
       }
-    } catch (err) {
-      setError('Ошибка при загрузке данных заказа');
-      console.error('Ошибка при получении данных заказа:', err);
+    } catch (error) {
+      setError('Произошла непредвиденная ошибка');
+      console.error('Ошибка в fetchOrderDetails:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Автоматическое обновление каждые 10 минут
+  // Автоматическое обновление каждые 10 минут (только в онлайн-режиме)
   useEffect(() => {
     fetchOrderDetails();
-    const intervalId = setInterval(fetchOrderDetails, 10 * 60 * 1000); // 10 минут
-    return () => clearInterval(intervalId);
-  }, [orderId, qrCode]);
+    if (isConnected) {
+      const intervalId = setInterval(fetchOrderDetails, 10 * 60 * 1000); // 10 минут
+      return () => clearInterval(intervalId);
+    }
+  }, [orderId, qrCode, isConnected]);
 
   // Обновление при потягивании вниз
   const onRefresh = async () => {
@@ -269,7 +362,9 @@ export default function OrderDetailsScreen({
       <FlatList
         ListHeaderComponent={renderHeader}
         data={products}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={item =>
+          item.id ? item.id.toString() : Math.random().toString()
+        }
         renderItem={renderProduct}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -341,10 +436,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   defaultBackground: {
-    backgroundColor: '#f0f0f0', // Светло-серый фон
+    backgroundColor: '#f0f0f0',
   },
   scannedBackground: {
-    backgroundColor: '#4CAF50', // Зеленый фон
+    backgroundColor: '#4CAF50',
   },
   checkmarkOverlay: {
     position: 'absolute',

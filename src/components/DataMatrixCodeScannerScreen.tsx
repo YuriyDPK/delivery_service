@@ -1,5 +1,5 @@
 // DataMatrixCodeScannerScreen.tsx
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import DeviceList from './datamatrixComponents/ui/DeviceList';
 import PrintLogs from './datamatrixComponents/ui/PrintLogs';
 import PermissionDeniedView from './datamatrixComponents/ui/PermissionDeniedView';
 import {stopScan} from './datamatrixComponents/stopScan';
+import {NetworkContext} from '../components/NetworkContext'; // Импортируем NetworkContext
 
 // Глобально определяем Buffer
 if (typeof global.Buffer === 'undefined') {
@@ -32,6 +33,7 @@ if (typeof global.Buffer === 'undefined') {
 
 export default function DataMatrixCodeScannerScreen({route, navigation}) {
   const {productId, orderId, qr} = route.params;
+  const {isConnected} = useContext(NetworkContext); // Используем NetworkContext
   const [hasPermission, setHasPermission] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [scannerKey, setScannerKey] = useState(Date.now());
@@ -43,7 +45,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
   const [replaceLast, setReplaceLast] = useState(false);
 
   // BLE состояние
-  const [showDeviceList, setShowDeviceList] = useState(false); // Показывать ли список устройств
+  const [showDeviceList, setShowDeviceList] = useState(false);
   const [devices, setDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [scanningBle, setScanningBle] = useState(false);
@@ -62,7 +64,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
 
   // Запрос разрешения на камеру
   useEffect(() => {
-    requestCameraPermission(setHasPermission); // Передаём setHasPermission
+    requestCameraPermission(setHasPermission);
   }, []);
 
   // Подписка на событие отключения устройства
@@ -83,17 +85,20 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
     }
   }, [connectedDevice]);
 
+  // Выполняем handleConfirm при сканировании
   useEffect(() => {
     if (scanned && dataMatrix && !success) {
       handleConfirm({
         qr,
         productId,
+        orderId, // Передаём orderId
         dataMatrix,
         setSuccess,
         setDataMatrixUrl,
+        isConnected, // Передаём состояние сети
       });
     }
-  }, [scanned, dataMatrix, success]);
+  }, [scanned, dataMatrix, success, isConnected]);
 
   return (
     <>
@@ -116,7 +121,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
               />
               {success && (
                 <View style={styles.successContainer}>
-                  <Image source={{uri: dataMatrixUrl}} style={styles.qrCode} />
+                  {/* Временно убираем отображение изображения, пока не добавим локальную генерацию */}
                   <Text style={styles.successText}>Успех</Text>
                   <View style={styles.buttonsContainer}>
                     <PrintButton

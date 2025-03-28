@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getDB} from './database';
 import {API_BASE_URL, API_KEY} from '../config';
 import NetInfo from '@react-native-community/netinfo';
-
+import {Alert} from 'react-native';
+import {SyncContext} from '../SyncContext';
 export const syncDataFromServer = async () => {
   const db = getDB();
   const userId = await AsyncStorage.getItem('userId');
@@ -219,7 +220,7 @@ export const syncDataFromServer = async () => {
                       order.id,
                       order.address || act.address,
                       order.clientFio || '',
-                      act.qr,
+                      act.qr_act,
                       order.number_act || act.number_act,
                       JSON.stringify(order.phone || []),
                       JSON.stringify(products),
@@ -265,48 +266,152 @@ export const syncDataFromServer = async () => {
 };
 
 export const syncPendingRequests = async () => {
-  const db = getDB();
-  if (!db) return;
-  const state = await NetInfo.fetch();
-  if (!state.isConnected) return;
+  const {setIsSyncing} = useContext(SyncContext);
+  setIsSyncing(true); // 👈 Начало
+  try {
+    const db = getDB();
+    if (!db) {
+      console.log('❌ Не удалось подключиться к базе данных');
+      return;
+    }
 
-  db.transaction(tx => {
-    tx.executeSql(
-      'SELECT * FROM pending_requests WHERE status = ?',
-      ['pending'],
-      async (_, {rows: {_array}}) => {
-        for (const request of _array) {
-          try {
-            const userId = await AsyncStorage.getItem('userId');
-            const response = await axios.get(
-              `${API_BASE_URL}/rest/orders/setQR/`,
-              {
-                params: {
-                  USER_ID: userId,
-                  QR: request.qr,
-                  PRODUCT_ID: request.productId,
-                  DATA_MATRIX: request.dataMatrix,
-                  API_KEY,
-                },
+    const state = await NetInfo.fetch();
+    if (!state.isConnected) {
+      console.log('❌ Нет интернет-соединения, синхронизация отменена');
+      return;
+    }
+
+    console.log('✅ Начинаем синхронизацию pending_requests...');
+
+    try {
+      console.log('⏳ Ожидаем завершения предыдущих транзакций...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Получаем все записи
+      const allRequests = await new Promise((resolve, reject) => {
+        db.transaction(tx => {
+          tx.executeSql(
+            'SELECT * FROM pending_requests',
+            [],
+            (_, {rows}) => {
+              const raw = rows.raw();
+              console.log('📋 Все записи в pending_requests:', raw);
+              resolve(raw);
+            },
+            (_, err) => {
+              console.error('❌ Ошибка при выборке всех записей:', err);
+              reject(err);
+              return false;
+            },
+          );
+        });
+      });
+
+      if (!allRequests.length) {
+        console.log(
+          'ℹ️ Таблица pending_requests пуста, синхронизировать нечего',
+        );
+        return;
+      }
+
+      // Получаем pending-запросы
+      const pendingRequests = await new Promise((resolve, reject) => {
+        db.transaction(tx => {
+          tx.executeSql(
+            'SELECT * FROM pending_requests WHERE TRIM(LOWER(status)) = ?',
+            ['pending'],
+            (_, {rows}) => {
+              const pending = rows.raw();
+              console.log('📋 Найдено pending-запросов:', pending);
+              resolve(pending);
+            },
+            (_, err) => {
+              console.error('❌ Ошибка при выборке pending-запросов:', err);
+              reject(err);
+              return false;
+            },
+          );
+        });
+      });
+
+      if (!pendingRequests.length) {
+        console.log('ℹ️ Нет запросов для синхронизации');
+        return;
+      }
+
+      // Отправляем запросы
+      for (const request of pendingRequests) {
+        try {
+          const userId = await AsyncStorage.getItem('userId');
+          if (!userId) {
+            console.error(`❌ userId отсутствует для запроса ${request.id}`);
+            continue;
+          }
+
+          console.log(`📤 Отправка запроса ${request.id} на сервер...`);
+          const response = await axios.get(
+            `${API_BASE_URL}/rest/orders/setQR/`,
+            {
+              params: {
+                USER_ID: userId,
+                QR: request.qr,
+                PRODUCT_ID: request.productId,
+                DATA_MATRIX: request.dataMatrix,
+                API_KEY,
               },
-            );
+            },
+          );
 
-            if (response.data.RESULT === 'OK') {
-              tx.executeSql('DELETE FROM pending_requests WHERE id = ?', [
-                request.id,
-              ]);
-              console.log(
-                `✅ Pending request ${request.id} отправлен и удалён`,
-              );
-            }
-          } catch (error) {
-            console.error(
-              `❌ Ошибка отправки pending request ${request.id}:`,
-              error,
+          console.log('📥 Ответ от сервера:', response.data);
+
+          if (response.data.RESULT === 'OK') {
+            Alert.alert(
+              'Код отправлен',
+              `Код для продукта ${request.productId} успешно отправлен.`,
+            );
+            // Удаляем успешный запрос
+            await new Promise((resolve, reject) => {
+              db.transaction(tx => {
+                tx.executeSql(
+                  'DELETE FROM pending_requests WHERE id = ?',
+                  [request.id],
+                  () => {
+                    console.log(
+                      `✅ Запрос ${request.id} удалён из pending_requests`,
+                    );
+                    resolve(true);
+                  },
+                  (_, err) => {
+                    console.error(
+                      `❌ Ошибка удаления запроса ${request.id}:`,
+                      err,
+                    );
+                    reject(err);
+                    return false;
+                  },
+                );
+              });
+            });
+          } else {
+            Alert.alert(
+              'Ошибка отправки',
+              `Код для продукта ${request.productId} не был принят сервером.`,
+            );
+            console.warn(
+              `⚠️ Ответ сервера для ${request.id} не OK:`,
+              response.data,
             );
           }
+        } catch (error) {
+          console.error(`❌ Ошибка при отправке запроса ${request.id}:`, error);
         }
-      },
-    );
-  });
+      }
+
+      console.log('✅ Синхронизация pending_requests завершена');
+    } catch (error) {
+      console.error('❌ Общая ошибка в syncPendingRequests:', error);
+    }
+  } finally {
+    setIsSyncing(false); // 👈 Конец
+  }
 };
