@@ -1,5 +1,5 @@
 // RouteDetailsScreen.tsx
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -19,11 +19,13 @@ import {QRButton} from './componentsRouteDetailsScreen/QRButton';
 // import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import {API_BASE_URL} from '../../config';
+import {API_BASE_URL, API_KEY} from '../../config';
 
 import MdiLocationPath from '../../assets/images/mdi_location-path.svg';
 import MdiLocationPathActive from '../../assets/images/mdi_location-path_active.svg';
 import LocationWhiteIcon from '../../assets/images/location-white.svg';
+
+import {NetworkContext} from '../components/NetworkContext'; // 👈 Добавляем
 
 const {width} = Dimensions.get('window');
 const baseWidth = 375; // базовая ширина для вычислений
@@ -43,6 +45,7 @@ export default function RouteDetailsScreen({route, navigation}) {
   const [refreshing, setRefreshing] = useState(false); // Состояние для pull-to-refresh
   const [isLoading, setIsLoading] = useState(false);
   const [isIconActive, setIsIconActive] = useState(false); // Состояние иконки
+  const {isConnected} = useContext(NetworkContext); // 👈 Хук подключения к интернету
 
   // const handleIconPress = () => {
   //   setIsIconActive((prev) => !prev); // Переключаем состояние иконки
@@ -50,47 +53,66 @@ export default function RouteDetailsScreen({route, navigation}) {
 
   // Функция для загрузки заказов
   const loadOrders = async () => {
-    setIsLoading(true);
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
         Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
-        setIsLoading(false);
         return;
       }
-      // console.log(routeId); --- delete
 
-      const response = await axios.get(`${API_BASE_URL}/rest/orders/getList/`, {
-        params: {
-          USER_ID: userId,
-          ROUTE_ID: routeId,
-          API_KEY:
-            '0TQVewPoqFubLhUinC1Mkm6boQC5RJ8M5wvknLe-LXhuBbqLt5PYngZSiERK81E3',
-        },
-      });
+      if (isConnected) {
+        const response = await axios.get(
+          `${API_BASE_URL}/rest/orders/getList/`,
+          {
+            params: {
+              USER_ID: userId,
+              ROUTE_ID: routeId,
+              API_KEY,
+            },
+          },
+        );
 
-      if (
-        response.data &&
-        response.data.RESULT &&
-        response.data.RESULT.length > 0
-      ) {
-        setOrders(response.data.RESULT);
-        setFilteredOrders(response.data.RESULT); // Фильтр совпадает с полным списком
+        if (response.data?.RESULT?.length) {
+          setOrders(response.data.RESULT);
+          setFilteredOrders(response.data.RESULT);
+        } else {
+          Alert.alert('Ошибка', 'Нет заказов по маршруту.');
+        }
       } else {
-        Alert.alert('Ошибка', 'Не удалось загрузить заказы, данных нет.');
+        const db = require('../../src/database').getDB();
+        console.log(userId);
+        console.log(routeId);
+
+        db.transaction(tx => {
+          tx.executeSql(
+            'SELECT * FROM acts WHERE id= ?',
+            [routeId],
+            (_, result) => {
+              const resultData = result.rows.raw();
+              setOrders(resultData);
+              console.log(resultData);
+
+              setFilteredOrders(resultData);
+            },
+            (_, err) => {
+              console.error('Ошибка загрузки актов из БД:', err);
+              return false;
+            },
+          );
+        });
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Ошибка при подключении к серверу.');
-    } finally {
-      setIsLoading(false);
+      console.error('Ошибка загрузки заказов:', error);
+      Alert.alert('Ошибка', 'Не удалось загрузить заказы');
     }
   };
 
   // Автоматическое обновление каждые 10 минут
   useEffect(() => {
-    const intervalId = setInterval(loadOrders, 10 * 60 * 1000); // 10 минут
+    loadOrders();
+    const intervalId = setInterval(loadOrders, 10 * 60 * 1000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isConnected, routeDetails.id]);
 
   // Изначальная загрузка данных
   useEffect(() => {
@@ -116,11 +138,10 @@ export default function RouteDetailsScreen({route, navigation}) {
   // Фильтрация заказов по строке поиска
   const handleSearch = query => {
     setSearchQuery(query);
-    const lowerCaseQuery = query.toLowerCase();
-    const filtered = orders.filter(order =>
-      order.number_act.toLowerCase().includes(lowerCaseQuery),
+    const lower = query.toLowerCase();
+    setFilteredOrders(
+      orders.filter(o => o.number_act.toLowerCase().includes(lower)),
     );
-    setFilteredOrders(filtered);
   };
 
   // Выбор адресов
@@ -134,12 +155,11 @@ export default function RouteDetailsScreen({route, navigation}) {
 
   // Добавление или снятие всех маршрутов
   const handleSelectAllRoutes = () => {
-    setIsIconActive(prev => !prev); // Переключаем состояние иконки
+    setIsIconActive(prev => !prev);
     if (selectedAddresses.length === orders.length) {
-      setSelectedAddresses([]); // Отменить выбор всех
+      setSelectedAddresses([]);
     } else {
-      const allAddresses = orders.map(order => order.address);
-      setSelectedAddresses(allAddresses); // Выбрать все
+      setSelectedAddresses(orders.map(o => o.address));
     }
   };
 
@@ -268,7 +288,7 @@ export default function RouteDetailsScreen({route, navigation}) {
           />
         )}
         keyExtractor={(item, index) =>
-          `${item.id?.trim() || 'default'}-${index}`
+          `${item.number_act}-${item.qr_act}-${index}`
         }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

@@ -1,5 +1,4 @@
-// RoutesScreen.tsx
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useContext} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {
   BackHandler,
@@ -20,6 +19,7 @@ import {API_BASE_URL, API_KEY} from '../../config';
 import ClockIcon from '../../assets/images/clock.svg';
 import CheckIcon from '../../assets/images/check.svg';
 import ChevronForwardIcon from '../../assets/images/chevron_forward.svg';
+import {NetworkContext} from './NetworkContext';
 
 // Типы для навигации
 type RootStackParamList = {
@@ -46,8 +46,7 @@ interface RoutesScreenProps {
   navigation: RoutesScreenNavigationProp;
 }
 
-// Получаем размеры экрана
-const {width, height} = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 const baseWidth = 375;
 const scale = width / baseWidth;
 
@@ -60,9 +59,11 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
   const [sections, setSections] = useState<any[]>([]);
   const [userName, setUserName] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const {isConnected} = useContext(NetworkContext);
 
-  const getTodayDate = () => {
+  const getTodayDate = (daysAgo = 0) => {
     const today = new Date();
+    today.setDate(today.getDate() - daysAgo);
     return today.toISOString().split('T')[0];
   };
 
@@ -111,12 +112,14 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
   };
 
   const fetchUserInfo = async () => {
+    if (!isConnected) {
+      console.log('⛔️ Нет интернета — данные пользователя берутся из кэша');
+      return;
+    }
+
     try {
       const userId = await AsyncStorage.getItem('userId');
-      if (!userId) {
-        Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
-        return;
-      }
+      if (!userId) return;
 
       const response = await axios.get(
         `${API_BASE_URL}/rest/user/getUserInfo/`,
@@ -127,48 +130,62 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
 
       if (response.data.RESULT) {
         setUserName(response.data.RESULT.firstName);
-      } else {
-        Alert.alert('Ошибка', 'Не удалось получить данные пользователя');
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Ошибка при подключении к серверу');
-      console.error(error);
+      console.error('Ошибка при получении пользователя:', error);
     }
   };
 
   const loadRoutes = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
-      if (!userId) {
-        console.error('User ID not found in AsyncStorage');
-        return;
-      }
+      if (!userId) return;
 
-      const today = getTodayDate();
-      const futureDate = getFutureDate(7);
+      if (isConnected) {
+        const today = getTodayDate(3);
+        const futureDate = getFutureDate(7);
 
-      const response = await axios.get(`${API_BASE_URL}/rest/routes/getList/`, {
-        params: {
-          USER_ID: userId,
-          API_KEY,
-          DATE_START: today,
-          DATE_END: futureDate,
-        },
-      });
+        const response = await axios.get(
+          `${API_BASE_URL}/rest/routes/getList/`,
+          {
+            params: {
+              USER_ID: userId,
+              API_KEY,
+              DATE_START: today,
+              DATE_END: futureDate,
+            },
+          },
+        );
 
-      if (response.data.RESULT) {
-        // console.log(response.data.RESULT); --- delete
-
-        const updatedRoutes = response.data.RESULT.map((route: any) => ({
-          ...route,
-          points: route.points || 0,
-        }));
-        setRoutes(updatedRoutes);
-        const newSections = groupRoutesByDate(updatedRoutes);
-        setSections(newSections);
+        if (response.data.RESULT) {
+          const updatedRoutes = response.data.RESULT.map((route: any) => ({
+            ...route,
+            points: route.points || 0,
+          }));
+          setRoutes(updatedRoutes);
+          setSections(groupRoutesByDate(updatedRoutes));
+        }
+      } else {
+        // 🔌 Если оффлайн — загружаем маршруты из локальной БД
+        const db = require('../../src/database').getDB();
+        db.transaction(tx => {
+          tx.executeSql(
+            'SELECT * FROM routes',
+            [],
+            (_, result) => {
+              const rows = result.rows.raw();
+              setRoutes(rows);
+              setSections(groupRoutesByDate(rows));
+            },
+            (_, error) => {
+              console.error('Ошибка при загрузке маршрутов из БД:', error);
+              return false;
+            },
+          );
+        });
       }
     } catch (error) {
-      console.error('Error fetching routes:', error);
+      console.error('Ошибка загрузки маршрутов:', error);
     }
   };
 
@@ -179,24 +196,20 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
   };
 
   useEffect(() => {
-    const intervalId = setInterval(loadRoutes, 10 * 60 * 1000);
-    return () => clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
     fetchUserInfo();
     loadRoutes();
-  }, []);
+    const intervalId = setInterval(loadRoutes, 10 * 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [isConnected]);
 
   useFocusEffect(
     useCallback(() => {
-      const onBackPress = () => true; // Блокируем кнопку "назад"
+      const onBackPress = () => true;
       const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
         onBackPress,
       );
-
-      return () => subscription.remove(); // Используем метод remove для отписки
+      return () => subscription.remove();
     }, []),
   );
 
@@ -246,25 +259,12 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
               </Text>
               <View style={styles.routeStatusContainer}>
                 {item.status === 'Закрыт' ? (
-                  <CheckIcon
-                    width={scaledSize(20)}
-                    height={scaledSize(20)}
-                    fill="green"
-                  />
+                  <CheckIcon width={20} height={20} fill="green" />
                 ) : item.status === 'В пути' ? (
-                  <ClockIcon
-                    width={scaledSize(20)}
-                    height={scaledSize(20)}
-                    fill="gray"
-                  />
+                  <ClockIcon width={20} height={20} fill="gray" />
                 ) : (
-                  <ClockIcon
-                    width={scaledSize(20)}
-                    height={scaledSize(20)}
-                    fill="red"
-                  />
+                  <ClockIcon width={20} height={20} fill="red" />
                 )}
-
                 <Text
                   style={[
                     styles.routeStatus,

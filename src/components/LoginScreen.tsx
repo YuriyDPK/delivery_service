@@ -18,6 +18,7 @@ import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {LoginScreenProps} from '../interfaces/interfaces';
+// import {syncDataFromServer, syncPendingRequests} from '../sync';
 
 // Получаем размеры экрана
 const {width, height} = Dimensions.get('window');
@@ -69,6 +70,10 @@ export default function LoginScreen({navigation}: LoginScreenProps) {
       if (response.data.RESULT && response.data.RESULT.id) {
         let fetchedUserId = response.data.RESULT.id;
         await AsyncStorage.setItem('userId', fetchedUserId);
+
+        // 🟢 СИНХРОНИЗАЦИЯ ПОСЛЕ ВХОДА
+        // await syncDataFromServer();
+        // await syncPendingRequests();
 
         Alert.alert('Успех', 'Авторизация успешна!');
         navigation.navigate('MainTabs', {screen: 'Route'});
