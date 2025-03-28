@@ -119,6 +119,8 @@ dependencies {
     implementation 'com.yandex.mapkit.styling:automotivenavigation:4.12.0'
     implementation 'com.yandex.mapkit.styling:roadevents:4.12.0'
     implementation 'com.google.android.gms:play-services-location:21.0.1'
+    implementation 'com.google.zxing:core:3.5.2'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

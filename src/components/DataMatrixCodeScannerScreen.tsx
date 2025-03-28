@@ -25,6 +25,7 @@ import PrintLogs from './datamatrixComponents/ui/PrintLogs';
 import PermissionDeniedView from './datamatrixComponents/ui/PermissionDeniedView';
 import {stopScan} from './datamatrixComponents/stopScan';
 import {NetworkContext} from '../components/NetworkContext'; // Импортируем NetworkContext
+import {generateDataMatrixBase64} from './DataMatrixNative';
 
 // Глобально определяем Buffer
 if (typeof global.Buffer === 'undefined') {
@@ -61,7 +62,13 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
       bleManager.destroy();
     };
   }, []);
-
+  useEffect(() => {
+    if (success) {
+      generateDataMatrixBase64(dataMatrix)
+        .then(uri => setDataMatrixUrl(uri))
+        .catch(() => {});
+    }
+  }, [success]);
   // Запрос разрешения на камеру
   useEffect(() => {
     requestCameraPermission(setHasPermission);
@@ -121,7 +128,13 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
               />
               {success && (
                 <View style={styles.successContainer}>
-                  {/* Временно убираем отображение изображения, пока не добавим локальную генерацию */}
+                  {dataMatrixUrl && (
+                    <Image
+                      source={{uri: dataMatrixUrl}}
+                      style={{width: 200, height: 200, marginTop: 20}}
+                      resizeMode="contain"
+                    />
+                  )}
                   <Text style={styles.successText}>Успех</Text>
                   <View style={styles.buttonsContainer}>
                     <PrintButton

@@ -9,7 +9,8 @@ class MyCustomPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
         return listOf(
             MyCustomModule(reactContext),
-            MapModule(reactContext)  
+            MapModule(reactContext),
+            DataMatrixModule(reactContext)
         )
     }
 

@@ -38,6 +38,12 @@ export const handleConfirm = async ({
 
       if (response.data.RESULT === 'OK') {
         setSuccess(true);
+        // const datamatrixResponse = await axios.get(
+        //   `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(
+        //     dataMatrix,
+        //   )}&code=DataMatrix`,
+        // );
+        // setDataMatrixUrl(datamatrixResponse.config.url);
         // Генерация DataMatrix-кода будет добавлена ниже
         Alert.alert('Успех', 'DataMatrix код успешно обновлён.');
       } else {

@@ -71,10 +71,6 @@ export default function LoginScreen({navigation}: LoginScreenProps) {
         let fetchedUserId = response.data.RESULT.id;
         await AsyncStorage.setItem('userId', fetchedUserId);
 
-        // 🟢 СИНХРОНИЗАЦИЯ ПОСЛЕ ВХОДА
-        // await syncDataFromServer();
-        // await syncPendingRequests();
-
         Alert.alert('Успех', 'Авторизация успешна!');
         navigation.navigate('MainTabs', {screen: 'Route'});
       } else {
