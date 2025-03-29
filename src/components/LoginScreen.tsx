@@ -1,5 +1,5 @@
 // LoginScreen.tsx
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
-import {StackNavigationProp} from '@react-navigation/stack';
 import {LoginScreenProps} from '../interfaces/interfaces';
-// import {syncDataFromServer, syncPendingRequests} from '../sync';
+import {UserContext} from '../../UserContext';
 
 // Получаем размеры экрана
 const {width, height} = Dimensions.get('window');
@@ -37,22 +36,26 @@ export default function LoginScreen({navigation}: LoginScreenProps) {
   const [colorLinkRegister, setColorLinkRegister] = useState('#007BFF');
   const [colorButtonEnter, setColorButtonEnter] = useState('#26232f');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null); // Типизируем userId
+
   const [isLoading, setIsLoading] = useState(true);
+
+  const {userId, setUserId, setIsAuthenticated} = useContext(UserContext);
 
   useEffect(() => {
     const checkUser = async () => {
       const storedUserId = await AsyncStorage.getItem('userId');
       if (storedUserId) {
-        setUserId(storedUserId); // storedUserId - строка, совместима с типом
+        setUserId(storedUserId); // Обновляем userId в контексте
+        setIsAuthenticated(true); // Устанавливаем isAuthenticated в true
         navigation.navigate('MainTabs', {screen: 'Route'});
       } else {
+        setIsAuthenticated(false); // Если userId нет, пользователь не авторизован
         setIsLoading(false);
       }
     };
 
     checkUser();
-  }, [navigation]);
+  }, [navigation, setUserId, setIsAuthenticated]);
 
   const handleLogin = async () => {
     try {
@@ -70,7 +73,8 @@ export default function LoginScreen({navigation}: LoginScreenProps) {
       if (response.data.RESULT && response.data.RESULT.id) {
         let fetchedUserId = response.data.RESULT.id;
         await AsyncStorage.setItem('userId', fetchedUserId);
-
+        setUserId(fetchedUserId); // Обновляем userId в контексте
+        setIsAuthenticated(true); // Устанавливаем isAuthenticated в true
         Alert.alert('Успех', 'Авторизация успешна!');
         navigation.navigate('MainTabs', {screen: 'Route'});
       } else {

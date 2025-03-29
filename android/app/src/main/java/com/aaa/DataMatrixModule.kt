@@ -1,6 +1,9 @@
 package com.aaa
 
+import android.content.ContentValues
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.provider.MediaStore
 import android.util.Base64
 import com.facebook.react.bridge.*
 import com.google.zxing.BarcodeFormat
@@ -44,4 +47,5 @@ class DataMatrixModule(reactContext: ReactApplicationContext) :
       promise.reject("DATAMATRIX_ERROR", "Ошибка генерации DataMatrix", e)
     }
   }
+  
 }

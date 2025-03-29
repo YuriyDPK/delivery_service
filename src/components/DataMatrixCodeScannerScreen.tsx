@@ -1,5 +1,5 @@
 // DataMatrixCodeScannerScreen.tsx
-import React, {useState, useEffect, useContext} from 'react';
+import React, {useState, useEffect, useContext, useRef} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Image,
   SafeAreaView,
   ScrollView,
+  Button,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import {BleManager} from 'react-native-ble-plx';
 import {Buffer} from 'buffer';
@@ -26,6 +29,8 @@ import PermissionDeniedView from './datamatrixComponents/ui/PermissionDeniedView
 import {stopScan} from './datamatrixComponents/stopScan';
 import {NetworkContext} from '../components/NetworkContext'; // Импортируем NetworkContext
 import {generateDataMatrixBase64} from './DataMatrixNative';
+import ViewShot, {captureRef} from 'react-native-view-shot';
+import {CameraRoll} from '@react-native-camera-roll/camera-roll';
 
 // Глобально определяем Buffer
 if (typeof global.Buffer === 'undefined') {
@@ -44,7 +49,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
   const [printLogs, setPrintLogs] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [replaceLast, setReplaceLast] = useState(false);
-
+  const viewShotRef = useRef(null);
   // BLE состояние
   const [showDeviceList, setShowDeviceList] = useState(false);
   const [devices, setDevices] = useState([]);
@@ -107,6 +112,41 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
     }
   }, [scanned, dataMatrix, success, isConnected]);
 
+  const saveShotToGallery = async () => {
+    try {
+      if (!CameraRoll) {
+        throw new Error(
+          'CameraRoll не доступен. Убедитесь, что библиотека @react-native-camera-roll/camera-roll установлена и настроена.',
+        );
+      }
+
+      if (Platform.OS === 'android') {
+        if (Platform.Version < 33) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert('Ошибка', 'Нет доступа к хранилищу');
+            return;
+          }
+        }
+        // На Android 13+ CameraRoll сам обрабатывает доступ к медиа
+      }
+
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1,
+      });
+
+      console.log('URI изображения:', uri);
+      await CameraRoll.save(uri, {type: 'photo'});
+      Alert.alert('Успех', 'Сохранено в галерею');
+    } catch (error) {
+      console.error('Ошибка при сохранении:', error);
+      Alert.alert('Ошибка', 'Не удалось сохранить: ' + error.message);
+    }
+  };
+
   return (
     <>
       <PermissionDeniedView
@@ -128,16 +168,25 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
               />
               {success && (
                 <View style={styles.successContainer}>
-                  {dataMatrixUrl && (
-                    <Image
-                      source={{uri: dataMatrixUrl}}
-                      style={{width: 200, height: 200, marginTop: 20}}
-                      resizeMode="contain"
-                    />
-                  )}
+                  <ViewShot
+                    ref={viewShotRef}
+                    options={{format: 'png', quality: 1}}>
+                    {dataMatrixUrl && (
+                      <Image
+                        source={{uri: dataMatrixUrl}}
+                        style={{width: 200, height: 200, marginTop: 20}}
+                        resizeMode="contain"
+                      />
+                    )}
+                  </ViewShot>
                   <Text style={styles.successText}>Успех</Text>
                   <View style={styles.buttonsContainer}>
-                    <PrintButton
+                    <Pressable
+                      style={[styles.button, {backgroundColor: '#28a745'}]}
+                      onPress={saveShotToGallery}>
+                      <Text style={styles.buttonText}>Сохранить в галерею</Text>
+                    </Pressable>
+                    {/* <PrintButton
                       manager={manager}
                       setDevices={setDevices}
                       setScanningBle={setScanningBle}
@@ -145,7 +194,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
                       stopScan={() => stopScan(manager, setScanningBle)}
                       scanningBle={scanningBle}
                       isSending={isSending}
-                    />
+                    /> */}
                     <ShareButton dataMatrixUrl={dataMatrixUrl} />
                     <ReplaceCodeButton
                       setReplaceLast={setReplaceLast}
@@ -223,5 +272,16 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  button: {
+    backgroundColor: '#28a745',
+    padding: 15,
+    borderRadius: 10,
+    width: '80%',
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });

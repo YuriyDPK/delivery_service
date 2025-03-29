@@ -1,10 +1,11 @@
+// src/sync.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getDB} from './database';
 import {API_BASE_URL, API_KEY} from '../config';
 import NetInfo from '@react-native-community/netinfo';
 import {Alert} from 'react-native';
-import {SyncContext} from '../SyncContext';
+
 export const syncDataFromServer = async () => {
   const db = getDB();
   const userId = await AsyncStorage.getItem('userId');
@@ -265,9 +266,8 @@ export const syncDataFromServer = async () => {
   }
 };
 
-export const syncPendingRequests = async () => {
-  const {setIsSyncing} = useContext(SyncContext);
-  setIsSyncing(true); // 👈 Начало
+export const syncPendingRequests = async setIsSyncing => {
+  setIsSyncing(true); // Устанавливаем состояние синхронизации
   try {
     const db = getDB();
     if (!db) {
@@ -412,6 +412,6 @@ export const syncPendingRequests = async () => {
       console.error('❌ Общая ошибка в syncPendingRequests:', error);
     }
   } finally {
-    setIsSyncing(false); // 👈 Конец
+    setIsSyncing(false); // Сбрасываем состояние синхронизации
   }
 };
