@@ -21,6 +21,23 @@ export const syncDataFromServer = async () => {
   }
 
   try {
+    await new Promise((resolve, reject) => {
+      db.transaction(
+        tx => {
+          tx.executeSql('DELETE FROM routes');
+          tx.executeSql('DELETE FROM acts');
+          tx.executeSql('DELETE FROM orders');
+        },
+        error => {
+          console.error('❌ Ошибка при очистке таблиц:', error);
+          reject(error);
+        },
+        () => {
+          console.log('✅ Очистка завершена');
+          resolve();
+        },
+      );
+    });
     let routes = [];
 
     // 1. Синхронизация пользователей
@@ -53,7 +70,7 @@ export const syncDataFromServer = async () => {
       return futureDate.toISOString().split('T')[0];
     };
 
-    const today = getTodayDate(3);
+    const today = getTodayDate(4);
     const futureDate = getFutureDate(7);
 
     const routesResponse = await axios.get(

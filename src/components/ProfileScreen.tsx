@@ -18,6 +18,8 @@ import {useFocusEffect} from '@react-navigation/native';
 import {BackHandler} from 'react-native';
 import {LoginScreenProps} from '../interfaces/interfaces';
 import {StackNavigationProp} from '@react-navigation/stack';
+import {getDB} from '../../src/database';
+import NetInfo from '@react-native-community/netinfo';
 
 import PencilIcon from '../../assets/images/pencil.svg';
 
@@ -79,7 +81,6 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        // Получаем userId из AsyncStorage
         const userId = await AsyncStorage.getItem('userId');
         if (!userId) {
           Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
@@ -87,33 +88,69 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
           return;
         }
 
-        // Выполняем запрос для получения информации о пользователе
-        const response = await axios.get(
-          `${API_BASE_URL}/rest/user/getUserInfo/`,
-          {
-            params: {
-              USER_ID: userId,
-              API_KEY:
-                '0TQVewPoqFubLhUinC1Mkm6boQC5RJ8M5wvknLe-LXhuBbqLt5PYngZSiERK81E3',
-            },
-          },
-        );
+        const state = await NetInfo.fetch();
 
-        if (response.data.RESULT) {
-          setUserInfo(response.data.RESULT);
-          // console.log(response.data.RESULT); --- delete
-          setUpdatedUserInfo(response.data.RESULT);
+        if (state.isConnected) {
+          // Если есть интернет — получаем с API и сохраняем в БД
+          const response = await axios.get(
+            `${API_BASE_URL}/rest/user/getUserInfo/`,
+            {
+              params: {USER_ID: userId, API_KEY},
+            },
+          );
+
+          if (response.data.RESULT) {
+            setUserInfo(response.data.RESULT);
+            setUpdatedUserInfo(response.data.RESULT);
+
+            const user = response.data.RESULT;
+            const db = getDB();
+            db.transaction(tx => {
+              tx.executeSql(
+                `REPLACE INTO users (id, firstName, lastName, middleName, email) VALUES (?, ?, ?, ?, ?)`,
+                [
+                  user.id,
+                  user.firstName,
+                  user.lastName,
+                  user.middleName,
+                  user.email,
+                ],
+              );
+            });
+          }
         } else {
-          Alert.alert('Ошибка', 'Не удалось получить данные пользователя');
+          // Если интернета нет — получаем из локальной БД
+          const db = getDB();
+          db.transaction(tx => {
+            tx.executeSql(
+              `SELECT * FROM users WHERE id = ?`,
+              [userId],
+              (_, {rows}) => {
+                if (rows.length > 0) {
+                  const localUser = rows.item(0);
+                  setUserInfo(localUser);
+                  setUpdatedUserInfo(localUser);
+                } else {
+                  Alert.alert(
+                    'Оффлайн режим',
+                    'Данные пользователя не найдены в локальной БД',
+                  );
+                }
+              },
+              (_, error) => {
+                console.error('Ошибка при получении данных из SQLite:', error);
+                return false;
+              },
+            );
+          });
         }
       } catch (error) {
-        Alert.alert('Ошибка', 'Ошибка при подключении к серверу');
-        console.error('Ошибка при получении информации о пользователе:', error);
+        Alert.alert('Ошибка', 'Ошибка при получении информации о пользователе');
+        console.error('Ошибка при получении информации:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchUserInfo();
   }, []);
 

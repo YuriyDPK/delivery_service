@@ -1,6 +1,6 @@
 // AppNavigator.tsx
 import React, {useContext} from 'react';
-import {View, ActivityIndicator} from 'react-native';
+import {View, ActivityIndicator, Alert} from 'react-native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 
@@ -21,11 +21,14 @@ import {UserContext} from './UserContext';
 import ClipboadIcon from './assets/images/clipboard.svg';
 import CalendarIcon from './assets/images/calendar.svg';
 import ProfileIcon from './assets/images/profile_circled.svg';
+import {NetworkContext} from './src/components/NetworkContext';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const {isConnected} = useContext(NetworkContext);
+
   return (
     <Tab.Navigator
       screenOptions={({route}) => ({
@@ -54,7 +57,18 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Archive"
-        component={ArchiveScreen}
+        component={isConnected ? ArchiveScreen : RoutesScreen}
+        listeners={({navigation}) => ({
+          tabPress: e => {
+            if (!isConnected) {
+              e.preventDefault(); // блокируем переход
+              Alert.alert(
+                'Нет интернета',
+                'Раздел "Архив" недоступен в оффлайн-режиме',
+              );
+            }
+          },
+        })}
         options={{headerShown: false, title: 'Архив'}}
       />
       <Tab.Screen

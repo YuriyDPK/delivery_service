@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import {OrderItem} from './componentsRouteDetailsScreen/OrderItem';
 import {QRButton} from './componentsRouteDetailsScreen/QRButton';
-// import Geolocation from 'react-native-geolocation-service';
+import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
@@ -192,31 +192,31 @@ export default function RouteDetailsScreen({route, navigation}) {
       Alert.alert('Разрешение на доступ к местоположению не получено');
       return;
     }
-    const addressesWithCurrentLocation = [...selectedAddresses];
-    const url = generateYandexMapsUrl(addressesWithCurrentLocation);
-    navigation.navigate('MapScreen', {mapUrl: url});
-    // Geolocation.getCurrentPosition(
-    //   position => {
-    //     const currentLocation = `${position.coords.latitude},${position.coords.longitude}`;
-    //     const addressesWithCurrentLocation = [
-    //       currentLocation,
-    //       ...selectedAddresses,
-    //     ];
-    //     const url = generateYandexMapsUrl(addressesWithCurrentLocation);
-    //     navigation.navigate('MapScreen', {mapUrl: url});
-    //   },
-    //   error => {
-    //     if (error.code === 2) {
-    //       Alert.alert(
-    //         'Геолокация отключена',
-    //         'Пожалуйста, включите службы геолокации в настройках устройства.',
-    //       );
-    //     } else {
-    //       Alert.alert('Не удалось получить местоположение', error.message);
-    //     }
-    //   },
-    //   {enableHighAccuracy: true, timeout: 30000, maximumAge: 10000},
-    // );
+    // const addressesWithCurrentLocation = [...selectedAddresses];
+    // const url = generateYandexMapsUrl(addressesWithCurrentLocation);
+    // navigation.navigate('MapScreen', {mapUrl: url});
+    Geolocation.getCurrentPosition(
+      position => {
+        const currentLocation = `${position.coords.latitude},${position.coords.longitude}`;
+        const addressesWithCurrentLocation = [
+          currentLocation,
+          ...selectedAddresses,
+        ];
+        const url = generateYandexMapsUrl(addressesWithCurrentLocation);
+        navigation.navigate('MapScreen', {mapUrl: url});
+      },
+      error => {
+        if (error.code === 2) {
+          Alert.alert(
+            'Геолокация отключена',
+            'Пожалуйста, включите службы геолокации в настройках устройства.',
+          );
+        } else {
+          Alert.alert('Не удалось получить местоположение', error.message);
+        }
+      },
+      {enableHighAccuracy: true, timeout: 30000, maximumAge: 10000},
+    );
   };
 
   const generateYandexMapsUrl = addresses => {

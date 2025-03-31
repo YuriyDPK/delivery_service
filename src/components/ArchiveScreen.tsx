@@ -20,6 +20,7 @@ import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
 import {useFocusEffect} from '@react-navigation/native';
 import {LoginScreenProps} from '../interfaces/interfaces';
+import NetInfo from '@react-native-community/netinfo';
 
 import ClockIcon from '../../assets/images/clock.svg';
 import CheckIcon from '../../assets/images/check.svg';
@@ -89,6 +90,20 @@ export default function ArchiveScreen({navigation}: LoginScreenProps) {
   const [searchText, setSearchText] = useState('');
   const [routes, setRoutes] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (!state.isConnected) {
+        Alert.alert(
+          'Оффлайн режим',
+          'Интернет отключён. Перенаправляем на сегодняшние маршруты.',
+        );
+        navigation.navigate('Routes');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
