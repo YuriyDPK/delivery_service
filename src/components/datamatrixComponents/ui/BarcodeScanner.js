@@ -12,6 +12,7 @@ const BarcodeScanner = ({
   replaceLast,
   setReplaceLast,
   setDataMatrix,
+  setLastScannedCode,
 }) => {
   if (success) return null;
 
@@ -24,7 +25,10 @@ const BarcodeScanner = ({
         onReadCode={
           scanned
             ? undefined
-            : event =>
+            : event => {
+                const newCode = event.nativeEvent.codeStringValue.trim();
+                setLastScannedCode(newCode);
+
                 handleBarCodeScanned({
                   event,
                   scanned,
@@ -32,7 +36,8 @@ const BarcodeScanner = ({
                   replaceLast,
                   setReplaceLast,
                   setDataMatrix,
-                })
+                });
+              }
         }
         showFrame={true}
         laserColor="#fff"

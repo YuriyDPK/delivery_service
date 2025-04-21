@@ -8,6 +8,6 @@ export const handleShare = async dataMatrixUrl => {
       url: dataMatrixUrl,
     });
   } catch (error) {
-    Alert.alert('Ошибка', 'Не удалось отправить DataMatrix код.');
+    customAlert('Ошибка', 'Не удалось отправить DataMatrix код.');
   }
 };

@@ -14,7 +14,7 @@ export const connectToDevice = async ({
     const connected = await device.connect({timeout: 10000});
     await connected.discoverAllServicesAndCharacteristics();
     setConnectedDevice(connected);
-    Alert.alert(
+    customAlert(
       'Успех',
       `Подключено к устройству: ${device.name || device.id}`,
     );
@@ -29,7 +29,7 @@ export const connectToDevice = async ({
     setShowDeviceList(false); // Закрываем список устройств
     return connected; // Возвращаем подключённое устройство
   } catch (error) {
-    Alert.alert('Ошибка', `Не удалось подключиться: ${error.message}`);
+    customAlert('Ошибка', `Не удалось подключиться: ${error.message}`);
     console.error('Ошибка при подключении:', error);
     return null;
   }

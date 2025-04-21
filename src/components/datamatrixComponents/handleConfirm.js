@@ -13,11 +13,15 @@ export const handleConfirm = async ({
   setSuccess,
   setDataMatrixUrl,
   isConnected, // Добавляем параметр для проверки состояния сети
+  customAlert, // Добавляем параметр для использования кастомного Alert
 }) => {
+  // Определяем функцию для показа алертов в зависимости от переданного параметра
+  // const showAlert = customAlert || Alert.alert;
+
   try {
     const userId = await AsyncStorage.getItem('userId');
     if (!userId) {
-      Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
+      customAlert('Ошибка', 'Не удалось получить ID пользователя');
       return;
     }
     console.log('qr111', qr);
@@ -45,15 +49,15 @@ export const handleConfirm = async ({
         // );
         // setDataMatrixUrl(datamatrixResponse.config.url);
         // Генерация DataMatrix-кода будет добавлена ниже
-        Alert.alert('Успех', 'DataMatrix код успешно обновлён.');
+        customAlert('Успех', 'DataMatrix код успешно обновлён.');
       } else {
-        Alert.alert('Ошибка', 'Не удалось обновить DataMatrix код.');
+        customAlert('Ошибка', 'Не удалось обновить DataMatrix код.');
       }
     } else {
       // Оффлайн-режим: сохраняем запрос в pending_requests
       const db = getDB();
       if (!db) {
-        Alert.alert(
+        customAlert(
           'Ошибка',
           'Не удалось подключиться к локальной базе данных',
         );
@@ -90,12 +94,12 @@ export const handleConfirm = async ({
         });
 
         setSuccess(true); // Устанавливаем success, чтобы показать пользователю, что операция "выполнена"
-        Alert.alert(
+        customAlert(
           'Оффлайн-режим',
           'DataMatrix код сохранён локально. Он будет отправлен на сервер, как только появится интернет.',
         );
       } catch (error) {
-        Alert.alert(
+        customAlert(
           'Ошибка',
           'Не удалось сохранить DataMatrix код в оффлайн-режиме.',
         );
@@ -106,7 +110,7 @@ export const handleConfirm = async ({
       }
     }
   } catch (error) {
-    Alert.alert('Ошибка', 'Произошла ошибка при обновлении DataMatrix кода.');
+    customAlert('Ошибка', 'Произошла ошибка при обновлении DataMatrix кода.');
     console.error('Ошибка при обновлении DataMatrix кода:', error);
   }
 };

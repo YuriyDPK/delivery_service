@@ -1,4 +1,4 @@
-package com.aaa
+package fss_delivery.ru
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -11,7 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
-import com.aaa.MyCustomPackage
+import fss_delivery.ru.MyCustomPackage
 // import com.yandex.mapkit.MapKitFactory
 
 class MainApplication : Application(), ReactApplication {

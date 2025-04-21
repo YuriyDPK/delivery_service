@@ -9,7 +9,7 @@ export const sendPrintCommand = async (
   setPrintLogs,
 ) => {
   if (!connectedDevice) {
-    Alert.alert('Ошибка', 'Нет подключенного устройства');
+    customAlert('Ошибка', 'Нет подключенного устройства');
     return;
   }
 
@@ -73,7 +73,7 @@ export const sendPrintCommand = async (
         ...prev,
         `✅ Успешно отправлено на ${characteristicUUID}`,
       ]);
-      Alert.alert('Успех', `Команда отправлена через ${characteristicUUID}`);
+      customAlert('Успех', `Команда отправлена через ${characteristicUUID}`);
     } catch (error) {
       setPrintLogs(prev => [
         ...prev,

@@ -18,6 +18,7 @@ import axios from 'axios';
 import {API_BASE_URL, API_KEY} from '../../config';
 import {LoginScreenProps} from '../interfaces/interfaces';
 import {UserContext} from '../../UserContext';
+import {customAlert} from './datamatrixComponents/customAlertManager';
 
 // Получаем размеры экрана
 const {width, height} = Dimensions.get('window');
@@ -75,13 +76,13 @@ export default function LoginScreen({navigation}: LoginScreenProps) {
         await AsyncStorage.setItem('userId', fetchedUserId);
         setUserId(fetchedUserId); // Обновляем userId в контексте
         setIsAuthenticated(true); // Устанавливаем isAuthenticated в true
-        Alert.alert('Успех', 'Авторизация успешна!');
+        customAlert('Успех', 'Авторизация успешна!');
         navigation.navigate('MainTabs', {screen: 'Route'});
       } else {
-        Alert.alert('Ошибка', 'Неверный логин или пароль');
+        customAlert('Ошибка', 'Неверный логин или пароль');
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Данные не найдены');
+      customAlert('Ошибка', 'Данные не найдены');
       console.error('Error during API request:', error);
     }
   };

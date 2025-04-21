@@ -16,6 +16,7 @@ import {Camera} from 'react-native-camera-kit';
 
 import {NetworkContext} from '../components/NetworkContext';
 import {getDB} from '../database';
+import {customAlert} from './datamatrixComponents/customAlertManager';
 
 interface QRCodeScannerScreenProps {
   route: any;
@@ -69,7 +70,7 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
-        Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
+        customAlert('Ошибка', 'Не удалось получить ID пользователя');
         return;
       }
 
@@ -97,17 +98,17 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
             console.log('qrCode: ', qrCode);
             navigation.navigate('OrderDetails', {orderId, qrCode});
           } else {
-            Alert.alert('Ошибка', 'Не удалось найти данные по заказу');
+            customAlert('Ошибка', 'Не удалось найти данные по заказу');
           }
         } catch (error) {
-          Alert.alert('Ошибка', 'Ошибка при подключении к серверу');
+          customAlert('Ошибка', 'Ошибка при подключении к серверу');
           console.error('Ошибка при получении информации о заказе:', error);
         }
       } else {
         // Оффлайн-режим: ищем заказы в локальной базе данных
         const db = getDB();
         if (!db) {
-          Alert.alert(
+          customAlert(
             'Ошибка',
             'Не удалось подключиться к локальной базе данных',
           );
@@ -149,7 +150,7 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
               navigation.navigate('OrderDetails', {orderId, qrCode});
             } else {
               // Если найдено несколько заказов, можно показать список для выбора
-              Alert.alert(
+              customAlert(
                 'Найдено несколько заказов',
                 `Обнаружено ${orders.length} заказов с QR-кодом ${qrCode}. Выберите один:`,
                 orders.map((order, index) => ({
@@ -167,10 +168,10 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
               );
             }
           } else {
-            Alert.alert('Ошибка', 'Заказ не найден в локальной базе данных');
+            customAlert('Ошибка', 'Заказ не найден в локальной базе данных');
           }
         } catch (error) {
-          Alert.alert(
+          customAlert(
             'Ошибка',
             'Ошибка при поиске заказа в локальной базе данных',
           );
@@ -178,7 +179,7 @@ const QRCodeScannerScreen: React.FC<QRCodeScannerScreenProps> = ({route}) => {
         }
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Произошла непредвиденная ошибка');
+      customAlert('Ошибка', 'Произошла непредвиденная ошибка');
       console.error('Ошибка в handleQRCodeScan:', error);
     }
   };

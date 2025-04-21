@@ -19,7 +19,7 @@ export const requestBLEPermissions = async () => {
         granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] ===
         PermissionsAndroid.RESULTS.GRANTED;
       if (!fineLocationGranted || !btScanGranted || !btConnectGranted) {
-        Alert.alert('Ошибка', 'BLE разрешения не предоставлены');
+        customAlert('Ошибка', 'BLE разрешения не предоставлены');
         return false;
       }
       return true;

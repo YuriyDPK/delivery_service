@@ -1,4 +1,4 @@
-package com.aaa
+package fss_delivery.ru
 
 import android.content.ContentValues
 import android.graphics.Bitmap

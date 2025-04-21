@@ -1,4 +1,4 @@
-package com.aaa
+package fss_delivery.ru
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise

@@ -142,7 +142,7 @@ export default function RoutesScreen({navigation}: RoutesScreenProps) {
       if (!userId) return;
 
       if (isConnected) {
-        const today = getTodayDate(4);
+        const today = getTodayDate(7);
         const futureDate = getFutureDate(7);
 
         const response = await axios.get(

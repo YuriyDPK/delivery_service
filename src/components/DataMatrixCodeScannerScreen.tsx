@@ -12,7 +12,10 @@ import {
   Button,
   PermissionsAndroid,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+
 import {BleManager} from 'react-native-ble-plx';
 import {Buffer} from 'buffer';
 import {requestCameraPermission} from './datamatrixComponents/cameraPermissions';
@@ -31,13 +34,37 @@ import {NetworkContext} from '../components/NetworkContext'; // Импортир
 import {generateDataMatrixBase64} from './DataMatrixNative';
 import ViewShot, {captureRef} from 'react-native-view-shot';
 import {CameraRoll} from '@react-native-camera-roll/camera-roll';
+import AlertProvider from './datamatrixComponents/AlertProvider';
+import {customAlert} from './datamatrixComponents/customAlertManager';
+
+// Определяем типы для route и navigation
+interface RouteParams {
+  productId: string;
+  orderId: string;
+  qr: string;
+}
+
+interface RouteProp {
+  params: RouteParams;
+}
+
+interface NavigationProp {
+  goBack: () => void;
+  navigate: (screen: string, params?: any) => void;
+}
 
 // Глобально определяем Buffer
 if (typeof global.Buffer === 'undefined') {
   global.Buffer = Buffer;
 }
 
-export default function DataMatrixCodeScannerScreen({route, navigation}) {
+export default function DataMatrixCodeScannerScreen({
+  route,
+  navigation,
+}: {
+  route: RouteProp;
+  navigation: NavigationProp;
+}) {
   const {productId, orderId, qr} = route.params;
   const {isConnected} = useContext(NetworkContext); // Используем NetworkContext
   const [hasPermission, setHasPermission] = useState(false);
@@ -50,26 +77,33 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
   const [isSending, setIsSending] = useState(false);
   const [replaceLast, setReplaceLast] = useState(false);
   const viewShotRef = useRef(null);
+  // Добавляем новые состояния
+  const [displayMode, setDisplayMode] = useState('image'); // 'image', 'text', or 'formatted'
+  const [formattedCode, setFormattedCode] = useState('');
   // BLE состояние
   const [showDeviceList, setShowDeviceList] = useState(false);
-  const [devices, setDevices] = useState([]);
-  const [connectedDevice, setConnectedDevice] = useState(null);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [connectedDevice, setConnectedDevice] = useState<any>(null);
   const [scanningBle, setScanningBle] = useState(false);
-  const [manager, setManager] = useState(null);
-  const [services, setServices] = useState([]);
-  const [characteristics, setCharacteristics] = useState({});
+  const [manager, setManager] = useState<BleManager | null>(null);
+  const [services, setServices] = useState<any[]>([]);
+  const [characteristics, setCharacteristics] = useState<Record<string, any>>(
+    {},
+  );
+  const [lastScannedCode, setLastScannedCode] = useState('');
 
   // Инициализация BLE менеджера
   useEffect(() => {
     const bleManager = new BleManager();
-    setManager(bleManager);
+    // Явно привести к типу BleManager перед установкой в state
+    setManager(bleManager as BleManager);
     return () => {
       bleManager.destroy();
     };
   }, []);
   useEffect(() => {
     if (success) {
-      generateDataMatrixBase64(dataMatrix)
+      generateDataMatrixBase64(lastScannedCode)
         .then(uri => setDataMatrixUrl(uri))
         .catch(() => {});
     }
@@ -82,15 +116,17 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
   // Подписка на событие отключения устройства
   useEffect(() => {
     if (connectedDevice) {
-      const subscription = connectedDevice.onDisconnected((error, device) => {
-        if (error) {
-          console.log('Ошибка при отключении:', error);
-        }
-        Alert.alert('Уведомление', `Устройство ${device.name} отключено`);
-        setConnectedDevice(null);
-        setServices([]);
-        setCharacteristics({});
-      });
+      const subscription = connectedDevice.onDisconnected(
+        (error: Error | null, device: any) => {
+          if (error) {
+            console.log('Ошибка при отключении:', error);
+          }
+          customAlert('Уведомление', `Устройство ${device.name} отключено`);
+          setConnectedDevice(null);
+          setServices([]);
+          setCharacteristics({});
+        },
+      );
       return () => {
         subscription.remove();
       };
@@ -108,9 +144,54 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
         setSuccess,
         setDataMatrixUrl,
         isConnected, // Передаём состояние сети
+        customAlert, // Используем кастомный Alert
       });
     }
   }, [scanned, dataMatrix, success, isConnected]);
+
+  // Извлечение кода идентификации (КИ) из DataMatrix
+  const extractIdentificationCode = (code: string): string => {
+    // Ищем паттерн КИ: 01 + 14 цифр + 21 + 13 символов
+    const kiPattern = /01\d{14}21.{13}/;
+    const match = code.match(kiPattern);
+
+    if (match && match[0]) {
+      return match[0]; // Возвращаем найденный КИ
+    }
+
+    // Если КИ не найден по шаблону, но длина кода минимум 31 символ
+    // И он начинается с 01 и содержит 21 на 17-18 позициях
+    if (
+      code.length >= 31 &&
+      code.startsWith('01') &&
+      code.substring(16, 18) === '21'
+    ) {
+      return code.substring(0, 31); // Берем первые 31 символ
+    }
+
+    // Если КИ не найден, возвращаем исходный код
+    return code;
+  };
+
+  // Обработка нажатия на код/изображение
+  const handleCodePress = () => {
+    // Циклическое переключение режимов отображения
+    if (displayMode === 'image') {
+      setDisplayMode('text');
+      // Копирование КИ в буфер обмена
+      const kiCode = extractIdentificationCode(lastScannedCode);
+      Clipboard.setString(kiCode);
+    } else {
+      setDisplayMode('image');
+    }
+  };
+
+  // Форматирование кода при его получении
+  useEffect(() => {
+    if (lastScannedCode) {
+      setFormattedCode(extractIdentificationCode(lastScannedCode));
+    }
+  }, [lastScannedCode]);
 
   const saveShotToGallery = async () => {
     try {
@@ -126,7 +207,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
             PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
           );
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            Alert.alert('Ошибка', 'Нет доступа к хранилищу');
+            customAlert('Ошибка', 'Нет доступа к хранилищу');
             return;
           }
         }
@@ -140,15 +221,22 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
 
       console.log('URI изображения:', uri);
       await CameraRoll.save(uri, {type: 'photo'});
-      Alert.alert('Успех', 'Сохранено в галерею');
-    } catch (error) {
+      customAlert(
+        'Успех',
+        displayMode === 'image'
+          ? 'DataMatrix код сохранен в галерею'
+          : 'Код идентификации (КИ) сохранен в галерею',
+      );
+    } catch (error: unknown) {
       console.error('Ошибка при сохранении:', error);
-      Alert.alert('Ошибка', 'Не удалось сохранить: ' + error.message);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Неизвестная ошибка';
+      customAlert('Ошибка', 'Не удалось сохранить: ' + errorMessage);
     }
   };
 
   return (
-    <>
+    <AlertProvider>
       <PermissionDeniedView
         hasPermission={hasPermission}
         setHasPermission={setHasPermission}
@@ -165,21 +253,43 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
                 replaceLast={replaceLast}
                 setReplaceLast={setReplaceLast}
                 setDataMatrix={setDataMatrix}
+                setLastScannedCode={setLastScannedCode}
               />
               {success && (
                 <View style={styles.successContainer}>
-                  <ViewShot
-                    ref={viewShotRef}
-                    options={{format: 'png', quality: 1}}>
-                    {dataMatrixUrl && (
-                      <Image
-                        source={{uri: dataMatrixUrl}}
-                        style={{width: 200, height: 200, marginTop: 20}}
-                        resizeMode="contain"
-                      />
+                  <TouchableOpacity onPress={handleCodePress}>
+                    <ViewShot
+                      ref={viewShotRef}
+                      options={{format: 'png', quality: 1}}>
+                      {displayMode === 'image' ? (
+                        dataMatrixUrl && (
+                          <Image
+                            source={{uri: dataMatrixUrl}}
+                            style={{width: 200, height: 200, marginTop: 20}}
+                            resizeMode="contain"
+                          />
+                        )
+                      ) : (
+                        <View style={styles.kiContainer}>
+                          <Text style={styles.codeTitle}>
+                            Код идентификации (КИ):
+                          </Text>
+                          <Text style={styles.codeText}>{formattedCode}</Text>
+                        </View>
+                      )}
+                    </ViewShot>
+
+                    {displayMode === 'text' && (
+                      <Text style={styles.codeCopiedText}>
+                        КИ скопирован в буфер обмена
+                      </Text>
                     )}
-                  </ViewShot>
+                  </TouchableOpacity>
                   <Text style={styles.successText}>Успех</Text>
+                  <Text style={styles.helpText}>
+                    Нажмите на изображение для переключения между DataMatrix и
+                    кодом идентификации (КИ)
+                  </Text>
                   <View style={styles.buttonsContainer}>
                     <Pressable
                       style={[styles.button, {backgroundColor: '#28a745'}]}
@@ -220,7 +330,6 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
                     setServices={setServices}
                     setCharacteristics={setCharacteristics}
                     dataMatrix={dataMatrix}
-                    connectedDevice={connectedDevice}
                     setIsSending={setIsSending}
                     setPrintLogs={setPrintLogs}
                   />
@@ -238,7 +347,7 @@ export default function DataMatrixCodeScannerScreen({route, navigation}) {
           </ScrollView>
         </SafeAreaView>
       )}
-    </>
+    </AlertProvider>
   );
 }
 
@@ -261,9 +370,54 @@ const styles = StyleSheet.create({
     color: 'green',
     fontWeight: 'bold',
   },
+  helpText: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
   qrCode: {
     width: 200,
     height: 200,
+  },
+  codeContainer: {
+    width: 200,
+    minHeight: 80,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginTop: 10,
+  },
+  kiContainer: {
+    width: 200,
+    minHeight: 120,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginTop: 20,
+  },
+  codeText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+  },
+  codeCopiedText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: 'green',
+    textAlign: 'center',
+  },
+  codeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+    marginBottom: 10,
   },
   buttonsContainer: {
     width: '100%',

@@ -64,7 +64,7 @@ export const loadDeviceDetails = async ({
     setCharacteristics(charsData);
 
     if (writableCharacteristics.length === 0) {
-      Alert.alert('Внимание', 'Не найдено записываемых характеристик');
+      customAlert('Внимание', 'Не найдено записываемых характеристик');
     } else {
       console.log('🔍 Найденные записываемые характеристики:');
       writableCharacteristics.forEach(item => {
@@ -76,7 +76,7 @@ export const loadDeviceDetails = async ({
 
     return writableCharacteristics;
   } catch (error) {
-    Alert.alert('Ошибка', 'Не удалось загрузить детали устройства');
+    customAlert('Ошибка', 'Не удалось загрузить детали устройства');
     console.error('Ошибка при загрузке сервисов и характеристик:', error);
   }
 };

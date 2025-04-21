@@ -22,6 +22,7 @@ import ClipboadIcon from './assets/images/clipboard.svg';
 import CalendarIcon from './assets/images/calendar.svg';
 import ProfileIcon from './assets/images/profile_circled.svg';
 import {NetworkContext} from './src/components/NetworkContext';
+import {customAlert} from './src/components/datamatrixComponents/customAlertManager';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -62,7 +63,7 @@ function MainTabs() {
           tabPress: e => {
             if (!isConnected) {
               e.preventDefault(); // блокируем переход
-              Alert.alert(
+              customAlert(
                 'Нет интернета',
                 'Раздел "Архив" недоступен в оффлайн-режиме',
               );

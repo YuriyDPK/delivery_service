@@ -22,6 +22,7 @@ import {getDB} from '../../src/database';
 import NetInfo from '@react-native-community/netinfo';
 
 import PencilIcon from '../../assets/images/pencil.svg';
+import {customAlert} from './datamatrixComponents/customAlertManager';
 
 // Типы для навигации
 type RootStackParamList = {
@@ -83,7 +84,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
       try {
         const userId = await AsyncStorage.getItem('userId');
         if (!userId) {
-          Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
+          customAlert('Ошибка', 'Не удалось получить ID пользователя');
           setIsLoading(false);
           return;
         }
@@ -131,7 +132,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
                   setUserInfo(localUser);
                   setUpdatedUserInfo(localUser);
                 } else {
-                  Alert.alert(
+                  customAlert(
                     'Оффлайн режим',
                     'Данные пользователя не найдены в локальной БД',
                   );
@@ -145,7 +146,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
           });
         }
       } catch (error) {
-        Alert.alert('Ошибка', 'Ошибка при получении информации о пользователе');
+        customAlert('Ошибка', 'Ошибка при получении информации о пользователе');
         console.error('Ошибка при получении информации:', error);
       } finally {
         setIsLoading(false);
@@ -159,7 +160,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
       await AsyncStorage.clear();
       navigation.navigate('Login');
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось выйти из аккаунта');
+      customAlert('Ошибка', 'Не удалось выйти из аккаунта');
       console.error('Ошибка при выходе из аккаунта:', error);
     }
   };
@@ -168,7 +169,7 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
-        Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
+        customAlert('Ошибка', 'Не удалось получить ID пользователя');
         return;
       }
 
@@ -193,12 +194,12 @@ export default function ProfileScreen({navigation}: LoginScreenProps) {
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 2000);
         setIsEditing(false);
-        Alert.alert('Успех', 'Данные успешно обновлены');
+        customAlert('Успех', 'Данные успешно обновлены');
       } else {
-        Alert.alert('Ошибка', 'Сервер вернул некорректный статус');
+        customAlert('Ошибка', 'Сервер вернул некорректный статус');
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Ошибка при обновлении данных пользователя');
+      customAlert('Ошибка', 'Ошибка при обновлении данных пользователя');
       console.error('Ошибка при обновлении информации о пользователе:', error);
     }
   };

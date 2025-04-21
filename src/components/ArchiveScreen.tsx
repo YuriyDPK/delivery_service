@@ -26,6 +26,7 @@ import ClockIcon from '../../assets/images/clock.svg';
 import CheckIcon from '../../assets/images/check.svg';
 import ChevronForwardIcon from '../../assets/images/chevron_forward.svg';
 import CalendarIcon from '../../assets/images/calendar.svg';
+import {customAlert} from './datamatrixComponents/customAlertManager';
 
 // Настройка локализации (русский язык)
 LocaleConfig.locales['ru'] = {
@@ -94,7 +95,7 @@ export default function ArchiveScreen({navigation}: LoginScreenProps) {
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       if (!state.isConnected) {
-        Alert.alert(
+        customAlert(
           'Оффлайн режим',
           'Интернет отключён. Перенаправляем на сегодняшние маршруты.',
         );
@@ -131,7 +132,7 @@ export default function ArchiveScreen({navigation}: LoginScreenProps) {
     selectedDate.setHours(0, 0, 0, 0);
 
     if (selectedDate >= today) {
-      Alert.alert(
+      customAlert(
         'Некорректная дата',
         'Вы не можете выбрать сегодняшнюю или более позднюю дату.',
       );

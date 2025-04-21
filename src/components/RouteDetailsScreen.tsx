@@ -26,6 +26,7 @@ import MdiLocationPathActive from '../../assets/images/mdi_location-path_active.
 import LocationWhiteIcon from '../../assets/images/location-white.svg';
 
 import {NetworkContext} from '../components/NetworkContext'; // 👈 Добавляем
+import {customAlert} from './datamatrixComponents/customAlertManager';
 
 const {width} = Dimensions.get('window');
 const baseWidth = 375; // базовая ширина для вычислений
@@ -56,7 +57,7 @@ export default function RouteDetailsScreen({route, navigation}) {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
-        Alert.alert('Ошибка', 'Не удалось получить ID пользователя');
+        customAlert('Ошибка', 'Не удалось получить ID пользователя');
         return;
       }
 
@@ -76,7 +77,7 @@ export default function RouteDetailsScreen({route, navigation}) {
           setOrders(response.data.RESULT);
           setFilteredOrders(response.data.RESULT);
         } else {
-          Alert.alert('Ошибка', 'Нет заказов по маршруту.');
+          customAlert('Ошибка', 'Нет заказов по маршруту.');
         }
       } else {
         const db = require('../../src/database').getDB();
@@ -103,7 +104,7 @@ export default function RouteDetailsScreen({route, navigation}) {
       }
     } catch (error) {
       console.error('Ошибка загрузки заказов:', error);
-      Alert.alert('Ошибка', 'Не удалось загрузить заказы');
+      customAlert('Ошибка', 'Не удалось загрузить заказы');
     }
   };
 
@@ -180,7 +181,7 @@ export default function RouteDetailsScreen({route, navigation}) {
           );
           return granted === PermissionsAndroid.RESULTS.GRANTED;
         } catch (err) {
-          Alert.alert('Ошибка при запросе разрешения', err.message);
+          customAlert('Ошибка при запросе разрешения', err.message);
           return false;
         }
       }
@@ -189,7 +190,7 @@ export default function RouteDetailsScreen({route, navigation}) {
 
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) {
-      Alert.alert('Разрешение на доступ к местоположению не получено');
+      customAlert('Разрешение на доступ к местоположению не получено');
       return;
     }
     // const addressesWithCurrentLocation = [...selectedAddresses];
@@ -207,12 +208,12 @@ export default function RouteDetailsScreen({route, navigation}) {
       },
       error => {
         if (error.code === 2) {
-          Alert.alert(
+          customAlert(
             'Геолокация отключена',
             'Пожалуйста, включите службы геолокации в настройках устройства.',
           );
         } else {
-          Alert.alert('Не удалось получить местоположение', error.message);
+          customAlert('Не удалось получить местоположение', error.message);
         }
       },
       {enableHighAccuracy: true, timeout: 30000, maximumAge: 10000},

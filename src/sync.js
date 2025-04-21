@@ -70,7 +70,7 @@ export const syncDataFromServer = async () => {
       return futureDate.toISOString().split('T')[0];
     };
 
-    const today = getTodayDate(4);
+    const today = getTodayDate(7);
     const futureDate = getFutureDate(7);
 
     const routesResponse = await axios.get(
@@ -382,7 +382,7 @@ export const syncPendingRequests = async setIsSyncing => {
           console.log('📥 Ответ от сервера:', response.data);
 
           if (response.data.RESULT === 'OK') {
-            Alert.alert(
+            customAlert(
               'Код отправлен',
               `Код для продукта ${request.productId} успешно отправлен.`,
             );
@@ -410,7 +410,7 @@ export const syncPendingRequests = async setIsSyncing => {
               });
             });
           } else {
-            Alert.alert(
+            customAlert(
               'Ошибка отправки',
               `Код для продукта ${request.productId} не был принят сервером.`,
             );

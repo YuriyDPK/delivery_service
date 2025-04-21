@@ -250,7 +250,7 @@ export default function OrderDetailsScreen({
 
   const copyToClipboard = (phone: string) => {
     Clipboard.setString(phone);
-    Alert.alert('Скопировано', `Номер ${phone} скопирован в буфер обмена`);
+    customAlert('Скопировано', `Номер ${phone} скопирован в буфер обмена`);
   };
 
   const makeCall = (phone: string) => {

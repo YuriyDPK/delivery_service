@@ -13,7 +13,7 @@ export const startScan = async ({
   if (!blePermsGranted) return;
 
   if (!manager) {
-    Alert.alert('Ошибка', 'BLE менеджер не инициализирован');
+    customAlert('Ошибка', 'BLE менеджер не инициализирован');
     return;
   }
 
@@ -23,7 +23,7 @@ export const startScan = async ({
 
   manager.startDeviceScan(null, {allowDuplicates: false}, (error, device) => {
     if (error) {
-      Alert.alert('Ошибка', `Не удалось начать сканирование: ${error.message}`);
+      customAlert('Ошибка', `Не удалось начать сканирование: ${error.message}`);
       setScanningBle(false);
       setShowDeviceList(false);
       return;
