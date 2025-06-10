@@ -5,6 +5,7 @@ import {getDB} from './database';
 import {API_BASE_URL, API_KEY} from '../config';
 import NetInfo from '@react-native-community/netinfo';
 import {Alert} from 'react-native';
+import {customAlert} from './components/datamatrixComponents/customAlertManager';
 
 export const syncDataFromServer = async () => {
   const db = getDB();

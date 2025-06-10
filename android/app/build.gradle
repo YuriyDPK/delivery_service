@@ -82,8 +82,8 @@ android {
         applicationId "fss_delivery.ru"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.4.1"
+        versionCode 10
+        versionName "1.4.3"
     }
     signingConfigs {
         debug {
