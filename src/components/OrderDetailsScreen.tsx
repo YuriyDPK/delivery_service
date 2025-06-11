@@ -288,7 +288,7 @@ export default function OrderDetailsScreen({
         </View>
       )) || <Text style={styles.text}>Телефон не указан</Text>}
 
-      <Text style={styles.title}>Список товаров {qrCode}</Text>
+      <Text style={styles.title}>Список товаров</Text>
     </View>
   );
 
